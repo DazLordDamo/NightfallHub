@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nightfall MC — Secure Terminal</title>
+
+<!-- LEAFLET CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<style>
+:root{
+  --bg:#050608; --panel:#0a0d12; --panel2:#11151d; --border:#1d2430;
+  --text:#e2e8f0; --muted:#718096; --accent:#5a32fa; --accent2:#7f5af0;
+  --green:#38a169; --red:#e53e3e; --yellow:#d69e2e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Courier New', Courier, monospace, ui-sans-serif, system-ui; overflow-x: hidden;}
+button,input{font:inherit; font-family: inherit;}
+
+.glitch-text { text-shadow: 0.5px 0.5px 0px rgba(255,0,0,0.5), -0.5px -0.5px 0px rgba(0,255,255,0.5); }
+
+/* APP LAYOUT */
+.app{display:flex;min-height:100vh; position: relative; z-index: 1;}
+.sidebar{width:250px;background:#050608;border-right:1px solid var(--border);padding:22px 16px;position:fixed;inset:0 auto 0 0; z-index: 10;}
+.brand{display:flex;align-items:center;gap:12px;padding:4px 10px 28px}
+.logo{width:42px;height:42px;border-radius:6px;background:var(--panel2);display:grid;place-items:center;overflow:hidden;border:1px solid #333; filter: grayscale(40%) contrast(120%);}
+.logo img{width:100%;height:100%;object-fit:cover;}
+.brand strong{font-size:15px; letter-spacing: 1px; color: #fff; text-transform: uppercase;}
+.brand span{display:block;color:var(--accent2);font-size:10px;margin-top:2px; letter-spacing: 2px;}
+
+.nav-label{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:#4a5568;padding:12px 11px 8px; font-weight: bold;}
+.nav button{width:100%;border:0;background:transparent;color:#a0aec0;text-align:left;padding:10px 12px;border-radius:4px;margin:2px 0;cursor:pointer; display:flex; align-items:center; transition: all 0.2s;}
+.nav button.active,.nav button:hover{background:#11151d;color:#fff; border-left: 3px solid var(--accent2);}
+.nav .icon{display:inline-block;width:25px;color:#718096; font-style: normal;}
+
+.sidebar-bottom{position:absolute;bottom:18px;left:16px;right:16px;border-top:1px dashed var(--border);padding-top:15px}
+.server-sync{font-size: 10px; color: var(--green); display: flex; align-items: center; gap: 6px; margin-bottom: 15px; padding: 0 8px; transition: color 0.3s;}
+.sync-dot{width: 6px; height: 6px; background: var(--green); border-radius: 50%; box-shadow: 0 0 5px var(--green); animation: pulse 2s infinite; transition: all 0.3s;}
+@keyframes pulse { 0% {opacity: 1;} 50% {opacity: 0.3;} 100% {opacity: 1;} }
+
+.profile{display:flex;align-items:center;gap:10px;padding:8px}
+.avatar{width:32px;height:32px;border-radius:4px;background:#1a202c;display:grid;place-items:center;font-size:12px; border: 1px solid #2d3748;}
+.profile small{display:block;color:var(--muted);font-size:10px}
+
+.main{margin-left:250px;width:calc(100% - 250px);padding:30px 34px; padding-bottom: 80px;}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px; border-bottom: 1px solid var(--border); padding-bottom: 15px;}
+h1{font-size:22px;margin:0 0 5px;letter-spacing:1px; text-transform: uppercase;}.subtitle{color:var(--muted);font-size:12px}
+.actions{display:flex;gap:9px; align-items: center;}.btn{background:var(--panel);border:1px solid var(--border);color:#e2e8f0;padding:8px 12px;border-radius:4px;cursor:pointer; font-weight: bold; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; transition: 0.2s;}.btn:hover{background: #1a202c;}.btn.primary{background:var(--accent);border-color:var(--accent);color:white; box-shadow: 0 0 10px rgba(90, 50, 250, 0.3);}.btn.primary:hover{background: var(--accent2);}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:19px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);}
+.stat-top{display:flex;justify-content:space-between;color:var(--muted);font-size:11px; text-transform: uppercase; letter-spacing: 1px;}.stat-icon{width:28px;height:28px;border-radius:4px;background:#11151d;display:grid;place-items:center; border: 1px solid #2d3748;}
+.stat-value{font-size:22px;font-weight:700;margin:15px 0 7px;letter-spacing:1px; color: #fff;}.trend{font-size:10px;color:var(--green)}.trend span{color:var(--muted)}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px; border-bottom: 1px dashed var(--border); padding-bottom: 10px;}.card-title{font-weight:700;font-size:13px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent2);}.card-head small{color:var(--muted); font-size: 10px;}
+
+/* Term Tables & Dossiers */
+.dossier-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:15px;}
+.dossier-card{background:#0a0d12; border:1px solid #2d3748; padding:12px; position: relative; border-left: 4px solid var(--accent2);}
+.dossier-img{width:100%; height:140px; background: #11151d; border: 1px solid #1a202c; margin-bottom: 10px; display: grid; place-items: center; color: #4a5568; font-size: 10px; text-transform: uppercase; background-size: cover; background-position: center;}
+.dossier-name{font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 2px; text-transform: uppercase;}
+.dossier-alias{font-size: 11px; color: var(--muted); margin-bottom: 8px;}
+.dossier-rank{display: inline-block; background: #1a202c; padding: 3px 6px; font-size: 10px; color: var(--accent2); border: 1px solid #2d3748; text-transform: uppercase;}
+.dossier-status{position: absolute; top: 18px; right: 18px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green);}
+
+.term-table{display:flex; flex-direction: column; gap: 10px;}
+.term-row{display: grid; background: #0a0d12; border: 1px solid #2d3748; padding: 12px; align-items: center; gap: 15px;}
+.term-row.head{border-bottom: 1px dashed var(--border); padding-bottom: 8px; border-top: none; border-left: none; border-right: none; background: transparent; color: var(--muted); font-size: 10px; font-weight: bold; text-transform: uppercase;}
+.badge{font-size: 10px; background: #2d3748; padding: 4px 8px; text-align: center; color: #e2e8f0; text-transform: uppercase; font-weight: bold; width: fit-content;}
+.badge.red{background: var(--red); color: white;}
+.badge.accent{background: var(--accent2); color: white;}
+.badge.yellow{background: #744210; color: var(--yellow); border: 1px solid var(--yellow);}
+.badge.green{background: #014636; color: var(--green); border: 1px solid var(--green);}
+.term-desc{font-size: 12px; color: #cbd5e0;}
+.plate-box{background: #e2e8f0; color: #1a202c; font-family: Impact, sans-serif; padding: 4px 8px; border-radius: 2px; letter-spacing: 2px; font-size: 14px; text-align: center; border: 2px solid #a0aec0; width: fit-content;}
+
+/* Toggle Groups (For Member Stats) */
+.toggle-group { display: flex; background: #0a0d12; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; width: fit-content; }
+.t-btn { background: transparent; border: none; color: var(--muted); padding: 8px 16px; font-size: 11px; font-weight: bold; text-transform: uppercase; cursor: pointer; transition: 0.2s; outline: none; }
+.t-btn:hover { background: #11151d; color: #fff; }
+.t-btn.active { background: var(--accent2); color: #fff; }
+
+/* Faction Tabs (Internal) */
+.faction-tabs{display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px; overflow-x: auto;}
+.f-tab{background: transparent; border: 1px solid transparent; color: var(--muted); padding: 8px 16px; cursor: pointer; text-transform: uppercase; font-size: 11px; font-weight: bold; border-radius: 4px; transition: 0.2s; white-space: nowrap; position: relative;}
+.f-tab.active{background: var(--panel); border: 1px solid var(--border); color: var(--accent2); box-shadow: 0 2px 0 var(--accent2);}
+.f-tab:hover:not(.active){color: #fff; background: #11151d;}
+.faction-content{display: none; animation: fadeIn 0.3s ease;}
+.faction-content.active{display: block;}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Ledger Specific */
+.ledger-grid{grid-template-columns: 80px 1fr 100px 100px 100px 80px;}
+.member-grid{grid-template-columns: 1fr 80px 120px 100px 120px;}
+.roster-grid{grid-template-columns: 1.5fr 1fr 1fr 120px;}
+.mono-num{font-family: 'Courier New', Courier, monospace; letter-spacing: -0.5px;}
+
+/* Slide-out Panel Overlay */
+.slide-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(2px); }
+.slide-overlay.open { opacity: 1; pointer-events: auto; }
+
+/* Slide-out Panel */
+.slide-panel { position: fixed; top: 0; right: -450px; width: 450px; height: 100vh; background: var(--panel2); border-left: 1px solid var(--border); box-shadow: -5px 0 30px rgba(0,0,0,0.8); transition: right 0.3s ease; z-index: 100; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; }
+.slide-panel.open { right: 0; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 25px; }
+.panel-title { font-size: 16px; font-weight: bold; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+.close-btn { background: transparent; border: none; color: var(--muted); font-size: 20px; cursor: pointer; transition: 0.2s; }
+.close-btn:hover { color: var(--red); }
+.calc-block { background: #0a0d12; border: 1px solid #2d3748; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+.calc-row { display: flex; justify-content: space-between; font-family: 'Courier New', Courier, monospace; font-size: 14px; margin-bottom: 8px; }
+.calc-divider { height: 1px; background: dashed 1px var(--border); margin: 10px 0; border-bottom: 1px dashed #2d3748; }
+
+.form-group{margin-bottom: 15px;}
+.form-group label{display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px;}
+.form-group input{width: 100%; background: #0a0d12; border: 1px solid #2d3748; color: #fff; padding: 10px; border-radius: 2px; font-family: inherit;}
+.form-group input:focus{outline: none; border-color: var(--accent2);}
+
+/* PIN AUTHORIZATION MODAL */
+.pin-modal-wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.2s ease; background: rgba(0,0,0,0.8); backdrop-filter: blur(3px); }
+.pin-modal-wrap.active { opacity: 1; pointer-events: auto; }
+.pin-modal { background: #0a0d12; border: 1px solid var(--red); box-shadow: 0 0 20px rgba(229, 62, 62, 0.2); padding: 30px; width: 350px; text-align: center; border-radius: 4px; }
+.pin-modal h2 { color: var(--red); margin: 0 0 10px; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 5px rgba(229, 62, 62, 0.5); }
+.pin-modal p { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+.pin-input { background: #050608; border: 1px solid #2d3748; color: #fff; font-size: 24px; text-align: center; padding: 10px; width: 100%; letter-spacing: 10px; font-family: monospace; outline: none; margin-bottom: 15px; }
+.pin-input:focus { border-color: var(--red); }
+.pin-error { color: var(--red); font-size: 11px; margin-bottom: 15px; height: 12px; font-weight: bold; }
+.pin-actions { display: flex; gap: 10px; }
+.pin-btn { flex: 1; padding: 10px; background: transparent; border: 1px solid var(--border); color: #fff; cursor: pointer; font-weight: bold; font-family: inherit; transition: 0.2s; }
+.pin-btn:hover { background: #1a202c; }
+.pin-btn.confirm { background: var(--red); border-color: var(--red); }
+.pin-btn.confirm:hover { background: #c53030; }
+
+/* DELETION STYLES */
+.removable { position: relative; }
+.delete-btn { display: none; position: absolute; top: -8px; right: -8px; background: var(--red); color: white; border: 1px solid #000; border-radius: 50%; width: 22px; height: 22px; font-size: 12px; cursor: pointer; z-index: 100; align-items: center; justify-content: center; line-height: 1; padding: 0; text-align: center; font-weight: bold; }
+.term-row.removable .delete-btn { top: 50%; transform: translateY(-50%); right: -10px; }
+.f-tab.removable .delete-btn { top: -8px; right: -8px; }
+
+/* INLINE EDIT MODE STYLES */
+body.edit-mode .delete-btn { display: flex; }
+body.edit-mode .editable {
+    border: 1px dashed var(--accent2);
+    padding: 2px 4px;
+    background: rgba(127, 90, 240, 0.1);
+    border-radius: 3px;
+    outline: none;
+    cursor: text;
+    transition: 0.2s;
+    display: inline-block;
+    min-width: 20px;
+}
+body.edit-mode .editable:focus {
+    border: 1px solid var(--accent);
+    background: rgba(127, 90, 240, 0.25);
+    box-shadow: 0 0 5px rgba(90, 50, 250, 0.5);
+}
+body.edit-mode .editable-img {
+    border: 1px dashed var(--accent2);
+    cursor: pointer;
+    position: relative;
+}
+body.edit-mode .editable-img::after {
+    content: "CLICK TO UPLOAD";
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: 0.2s;
+    font-size: 10px;
+    color: #fff;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+body.edit-mode .editable-img:hover::after {
+    opacity: 1;
+}
+
+#save-edits-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 34px;
+    z-index: 50;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+    padding: 12px 24px;
+    font-size: 14px;
+}
+
+/* Map specific tweaks */
+.leaflet-container { background: #050608 !important; border-radius: 4px; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #0a0d12 !important; color: #fff !important; border: 1px solid #2d3748; }
+
+.hidden { display: none !important; }
+.text-red { color: var(--red); }
+.text-green { color: var(--green); }
+.text-yellow { color: var(--yellow); }
+</style>
+</head>
+<body>
+
+<!-- Hidden File Uploader -->
+<input type="file" id="image-uploader" accept="image/*" style="display:none;">
+
+<div class="app">
+<aside class="sidebar">
+  <div class="brand">
+    <div class="logo">
+      <img src="Screenshot 2026-08-17 105216.png" alt="Nightfall MC">
+    </div>
+    <div><strong class="glitch-text">NIGHTFALL</strong><span>SECURE_OS v4.0</span></div>
+  </div>
+  
+  <div class="nav-label">Operations</div>
+  <div class="nav">
+    <button class="nav-btn active" data-target="view-dashboard"><span class="icon">💻</span><span>Terminal Main</span></button>
+    <button class="nav-btn" data-target="view-members"><span class="icon">📊</span><span>Wash Stats</span></button>
+    <button class="nav-btn" data-target="view-map"><span class="icon">🗺️</span><span>Territory Map</span></button>
+  </div>
+  
+  <div class="nav-label">Assets & Intel</div>
+  <div class="nav">
+    <button class="nav-btn" data-target="view-armory"><span class="icon">🔫</span><span>Armory/Stash</span></button>
+    <button class="nav-btn" data-target="view-factions"><span class="icon">🕵️</span><span>Faction Intel</span></button>
+    <button class="nav-btn" data-target="view-finances"><span class="icon">💵</span><span>Wash Ledgers</span></button>
+  </div>
+  
+  <div class="nav-label">Organization</div>
+  <div class="nav">
+    <button class="nav-btn" data-target="view-hierarchy"><span class="icon">📁</span><span>Dossiers</span></button>
+    <button class="nav-btn" data-target="view-roster"><span class="icon">📋</span><span>Roster Admin</span></button>
+    <button class="nav-btn" data-target="view-settings"><span class="icon">⚙️</span><span>Sys Settings</span></button>
+  </div>
+  
+  <div class="sidebar-bottom">
+    <button class="btn" id="edit-mode-toggle-btn" style="width: 100%; margin-bottom: 15px; font-size: 10px; border-color: var(--border); color: var(--muted);" onclick="requireAuth(toggleEditMode)">ENABLE EDIT MODE</button>
+    <div id="sync-container" class="server-sync">
+      <div id="sync-dot" class="sync-dot"></div>
+      <span id="player-count">City Sync: Active</span>
+    </div>
+    <div class="profile"><div class="avatar">SYS</div><div><b style="font-size:12px; color: #fff;">Terminal_Active</b><small>Standard Access</small></div></div>
+  </div>
+</aside>
+
+<main class="main">
+  <!-- VIEW: DASHBOARD -->
+  <div id="view-dashboard" class="view-section">
+    <div class="topbar">
+      <div><h1 class="glitch-text">Operations Overview</h1><div class="subtitle">System encrypted. Connection secure.</div></div>
+      <div class="actions"><button class="btn primary" onclick="openPanel('log-wash-panel')">＋ LOG WASH</button></div>
+    </div>
+    <section class="stats">
+      <div class="card"><div class="stat-top"><span>Dirty Processed</span><div class="stat-icon">💵</div></div><div class="stat-value" id="dash-dirty">$0</div></div>
+      <div class="card"><div class="stat-top"><span>Clean Returned</span><div class="stat-icon">💼</div></div><div class="stat-value" id="dash-clean">$0</div></div>
+      <div class="card"><div class="stat-top"><span>Heat Level</span><div class="stat-icon">🚨</div></div><div class="stat-value text-yellow editable" id="dash-heat">ELEVATED</div><div class="trend"><span class="editable" id="dash-heat-desc">FIB presence detected</span></div></div>
+      <div class="card"><div class="stat-top"><span>Active Intel</span><div class="stat-icon">🕵️</div></div><div class="stat-value editable" id="dash-intel-count">2</div><div class="trend"><span class="editable" id="dash-intel-desc">Rival factions logged</span></div></div>
+    </section>
+  </div>
+
+  <!-- VIEW: MEMBER STATS -->
+  <div id="view-members" class="view-section hidden">
+    <div class="topbar">
+      <div><h1 class="glitch-text">Member Wash Statistics</h1><div class="subtitle">Individual throughput and generated tax.</div></div>
+      <div class="actions">
+        <div class="toggle-group">
+          <button class="t-btn active" onclick="setStatsTimeframe('weekly', this)">Weekly</button>
+          <button class="t-btn" onclick="setStatsTimeframe('monthly', this)">Monthly</button>
+          <button class="t-btn" onclick="setStatsTimeframe('annual', this)">Annual</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="term-table">
+        <div class="term-row head member-grid">
+          <div>Member / Alias</div>
+          <div>Trans.</div>
+          <div>Dirty Input</div>
+          <div>Fees Gen.</div>
+          <div>Clean Out</div>
+        </div>
+        <div class="term-row member-grid removable" id="ms-row-1">
+          <span class="delete-btn" onclick="removeLocalElement('ms-row-1', event)">✕</span>
+          <div class="term-desc editable" id="ms-1-name" style="font-weight: bold; font-size: 14px; color: #fff;">Mike "Ghost" K.</div>
+          <div class="mono-num editable" id="ms-1-tx">14</div>
+          <div class="mono-num text-red" id="ms-1-dirty">-$120,000</div>
+          <div class="mono-num" style="color:var(--yellow);" id="ms-1-fee">+$28,800</div>
+          <div class="mono-num text-green" id="ms-1-clean">+$91,200</div>
+        </div>
+        <div class="term-row member-grid removable" id="ms-row-2">
+          <span class="delete-btn" onclick="removeLocalElement('ms-row-2', event)">✕</span>
+          <div class="term-desc editable" id="ms-2-name" style="font-weight: bold; font-size: 14px; color: #fff;">Ricky S.</div>
+          <div class="mono-num editable" id="ms-2-tx">8</div>
+          <div class="mono-num text-red" id="ms-2-dirty">-$50,000</div>
+          <div class="mono-num" style="color:var(--yellow);" id="ms-2-fee">+$12,000</div>
+          <div class="mono-num text-green" id="ms-2-clean">+$38,000</div>
+        </div>
+        <div class="term-row member-grid removable" id="ms-row-3">
+          <span class="delete-btn" onclick="removeLocalElement('ms-row-3', event)">✕</span>
+          <div class="term-desc editable" id="ms-3-name" style="font-weight: bold; font-size: 14px; color: #fff;">John "Reaper" Doe</div>
+          <div class="mono-num editable" id="ms-3-tx">3</div>
+          <div class="mono-num text-red" id="ms-3-dirty">-$25,000</div>
+          <div class="mono-num" style="color:var(--yellow);" id="ms-3-fee">+$6,000</div>
+          <div class="mono-num text-green" id="ms-3-clean">+$19,000</div>
+        </div>
+        <div class="term-row member-grid removable" id="ms-row-4">
+          <span class="delete-btn" onclick="removeLocalElement('ms-row-4', event)">✕</span>
+          <div class="term-desc editable" id="ms-4-name" style="font-weight: bold; font-size: 14px; color: #fff;">Tommy "Rookie" S.</div>
+          <div class="mono-num editable" id="ms-4-tx">1</div>
+          <div class="mono-num text-red editable" id="ms-4-dirty">-$100,000</div>
+          <div class="mono-num editable" style="color:var(--yellow);" id="ms-4-fee">+$25,000</div>
+          <div class="mono-num text-green editable" id="ms-4-clean">+$75,000</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: ARMORY -->
+  <div id="view-armory" class="view-section hidden">
+    <div class="topbar">
+      <div><h1 class="glitch-text">Armory & Stash</h1><div class="subtitle">Inventory tracking for club properties.</div></div>
+    </div>
+    <div class="stats">
+      <div class="card"><div class="stat-top"><span>Assault Rifles</span></div><div class="stat-value editable" id="arm-ar">14</div></div>
+      <div class="card"><div class="stat-top"><span>Heavy Armor</span></div><div class="stat-value editable" id="arm-ha">22</div></div>
+      <div class="card"><div class="stat-top"><span>Thermite</span></div><div class="stat-value text-red editable" id="arm-th">2</div><div class="trend text-red"><span>Low stock</span></div></div>
+      <div class="card"><div class="stat-top"><span>Dirty Cash Stashed</span></div><div class="stat-value editable" id="arm-cash">$145,000</div></div>
+    </div>
+  </div>
+
+  <!-- VIEW: FACTION INTEL -->
+  <div id="view-factions" class="view-section hidden">
+    <div class="topbar">
+      <div><h1 class="glitch-text">Faction Intel</h1><div class="subtitle">Database of rival crews, gangs, and organizations.</div></div>
+      <div class="actions"><button class="btn primary" id="add-faction-btn">＋ ADD FACTION</button></div>
+    </div>
+    <div class="faction-tabs" id="faction-tab-list">
+      <button class="f-tab active removable" id="tab-f-ballas" data-faction="f-ballas">Ballas <span class="delete-btn" onclick="removeLocalElement('tab-f-ballas', event); removeLocalElement('f-ballas', event)">✕</span></button>
+      <button class="f-tab removable" id="tab-f-syndicate" data-faction="f-syndicate">Northside Synd. <span class="delete-btn" onclick="removeLocalElement('tab-f-syndicate', event); removeLocalElement('f-syndicate', event)">✕</span></button>
+    </div>
+    <div id="faction-content-container">
+      <div class="faction-content active removable" id="f-ballas">
+        <div class="grid">
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Known Members</div></div></div>
+            <div class="term-table">
+               <div class="term-row head" style="grid-template-columns: 1fr 1.5fr;"><div>Name/Alias</div><div>Notes & Comms</div></div>
+               <div class="term-row removable" id="fb-m1-row" style="grid-template-columns: 1fr 1.5fr;"><span class="delete-btn" onclick="removeLocalElement('fb-m1-row', event)">✕</span><div style="font-weight:bold;" class="editable" id="fb-m1-name">Tyrone</div><div class="term-desc editable" id="fb-m1-desc">Shotcaller. Usually armed with a heavy pistol.</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Properties & Housing</div></div></div>
+             <div class="term-table">
+               <div class="term-row head" style="grid-template-columns: 1fr 80px;"><div>Location / Address</div><div>Type</div></div>
+               <div class="term-row removable" id="fb-p1-row" style="grid-template-columns: 1fr 80px;"><span class="delete-btn" onclick="removeLocalElement('fb-p1-row', event)">✕</span><div class="editable" id="fb-p1-loc">Grove St. Cul-de-sac</div><div><span class="badge red editable" id="fb-p1-type">HQ</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="faction-content removable" id="f-syndicate">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Known Vehicles & Plates</div></div></div>
+          <div class="term-table">
+              <div class="term-row head" style="grid-template-columns: 150px 100px 1fr;"><div>Model</div><div>Plate</div><div>Identifying Marks / Notes</div></div>
+              <div class="term-row removable" id="fs-v1-row" style="grid-template-columns: 150px 100px 1fr;"><span class="delete-btn" onclick="removeLocalElement('fs-v1-row', event)">✕</span><div style="font-weight:bold;" class="editable" id="fs-v1-mod">Toyota Hilux Surf</div><div class="plate-box editable" id="fs-v1-plate">NTHS1D3</div><div class="term-desc editable" id="fs-v1-desc">Custom NZ-style plate. Used for rural off-road stash runs.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: WASH LEDGERS -->
+  <div id="view-finances" class="view-section hidden">
+    <div class="topbar">
+      <div><h1 class="glitch-text">Wash Ledgers</h1><div class="subtitle">Encrypted historical transaction data.</div></div>
+      <div class="actions"><button class="btn primary" onclick="openPanel('log-wash-panel')">＋ LOG WASH</button></div>
+    </div>
+    <div class="card">
+      <div class="term-table" id="ledger-table">
+        <div class="term-row head ledger-grid">
+          <div>ID</div>
+          <div>Operator</div>
+          <div>Dirty Input</div>
+          <div>Tax / Fee</div>
+          <div>Clean Out</div>
+          <div>Status</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: DOSSIERS (Hierarchy) -->
+  <div id="view-hierarchy" class="view-section hidden">
+    <div class="topbar">
+      <div><h1 class="glitch-text">Club Dossiers</h1><div class="subtitle">Encrypted member database.</div></div>
+      <div class="actions"><button class="btn primary" onclick="requireAuth(() => openMemberPanel())">＋ ADD MEMBER</button></div>
+    </div>
+    <div class="card-head" style="margin-top: 20px;"><div><div class="card-title">Club Roster</div></div></div>
+    <section class="dossier-grid" id="dossier-grid-main">
+      <!-- Generated via JS Roster Data -->
+    </section>
+  </div>
+
+  <!-- VIEW: ROSTER ADMIN -->
+  <div id="view-roster" class="view-section hidden">
+    <div class="topbar">
+      <div><h1 class="glitch-text">Roster Administration</h1><div class="subtitle">Manage member ranks, details, and access.</div></div>
+      <div class="actions"><button class="btn primary" onclick="requireAuth(() => openMemberPanel())">＋ ADD MEMBER</button></div>
+    </div>
+    <div class="card">
+      <div class="term-table" id="roster-table">
+        <div class="term-row head roster-grid">
+          <div>Member Name</div>
+          <div>Alias</div>
+          <div>Rank</div>
+          <div>Actions</div>
+        </div>
+        <div id="roster-table-body" style="display: contents;">
+          <!-- Generated via JS Roster Data -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: MAP PLACEHOLDER -->
+  <div id="view-map" class="view-section hidden">
+    <div class="topbar">
+      <div><h1 class="glitch-text">Territory Map</h1><div class="subtitle">Live GPS tracking and turf borders.</div></div>
+    </div>
+    <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border);">
+       <div id="leaflet-map-container" style="height: 600px; width: 100%; background: #050608;"></div>
+    </div>
+  </div>
+
+  <!-- VIEW: SETTINGS -->
+  <div id="view-settings" class="view-section hidden">
+    <div class="topbar">
+      <div><h1 class="glitch-text">System Settings</h1><div class="subtitle">Configure automated webhooks and dashboard variables.</div></div>
+      <div class="actions"><button class="btn primary" onclick="requireAuth(saveAllEdits)">SAVE CONFIG</button></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">Economy Rates</div></div></div>
+        <div class="form-group">
+          <label>Standard Wash Fee (%)</label>
+          <input type="number" value="25" id="sys-fee" class="editable" disabled>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">Discord Automations</div></div></div>
+        <div class="form-group">
+          <label>Wash Receipts Webhook URL</label>
+          <input type="password" value="https://discord.com/api/webhooks/xxxx/yyyy">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE-OUT PANEL (LOG WASH) -->
+  <div class="slide-overlay" id="slide-overlay" onclick="closePanel()"></div>
+  <div class="slide-panel" id="log-wash-panel">
+    <div class="panel-header">
+      <div class="panel-title">Initiate Wash Protocol</div>
+      <button class="close-btn" onclick="closePanel()">✕</button>
+    </div>
+    <div class="form-group">
+      <label>Operator / Submitting Member</label>
+      <input type="text" id="wash-operator" placeholder="e.g. John Doe" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Dirty Cash Handed In ($)</label>
+      <input type="number" id="calc-dirty" placeholder="10000" min="0" autocomplete="off">
+    </div>
+    <div class="calc-block">
+      <div class="calc-row">
+        <span style="color:var(--muted)">Wash Fee (<span id="display-fee-rate">25</span>%)</span>
+        <span class="text-red" id="calc-fee">-$0</span>
+      </div>
+      <div class="calc-divider"></div>
+      <div class="calc-row" style="font-weight: bold; font-size: 18px;">
+        <span style="color:#fff">Clean Return</span>
+        <span class="text-green" id="calc-clean">+$0</span>
+      </div>
+    </div>
+    <div style="margin-top: auto; display: flex; gap: 10px;">
+      <button class="btn" style="flex: 1;" onclick="closePanel()">CANCEL</button>
+      <button class="btn primary" style="flex: 2;" onclick="requireAuth(submitWash)">SUBMIT TRANSACTION</button>
+    </div>
+  </div>
+
+  <!-- SLIDE-OUT PANEL (MEMBER ADMIN) -->
+  <div class="slide-panel" id="member-panel">
+    <div class="panel-header">
+      <div class="panel-title" id="member-panel-title">Add New Member</div>
+      <button class="close-btn" onclick="closePanel()">✕</button>
+    </div>
+    <input type="hidden" id="mem-id">
+    <div class="form-group">
+      <label>Full Name / RP Name</label>
+      <input type="text" id="mem-name" placeholder="e.g. John Doe" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Known Alias</label>
+      <input type="text" id="mem-alias" placeholder="e.g. Reaper" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Club Rank</label>
+      <input type="text" id="mem-rank" placeholder="e.g. Prospect, Enforcer, Picker" autocomplete="off">
+    </div>
+    <div style="margin-top: auto; display: flex; gap: 10px;">
+      <button class="btn" style="flex: 1;" onclick="closePanel()">CANCEL</button>
+      <button class="btn primary" style="flex: 2;" onclick="requireAuth(saveMember)">SAVE RECORD</button>
+    </div>
+  </div>
+  
+  <!-- FLOATING SAVE BUTTON FOR EDIT MODE -->
+  <button id="save-edits-btn" class="btn primary hidden" onclick="requireAuth(saveAllEdits)">SAVE OVERRIDE</button>
+</main>
+</div>
+
+<!-- AUTHORIZATION PIN MODAL -->
+<div class="pin-modal-wrap" id="pin-modal-wrap">
+  <div class="pin-modal">
+    <h2>AUTHORIZATION OVERRIDE</h2>
+    <p>Administrative clearance required to commit records.</p>
+    <input type="password" class="pin-input" id="auth-pin" maxlength="4" autocomplete="off" placeholder="••••" />
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-actions">
+      <button class="pin-btn" onclick="cancelAuth()">ABORT</button>
+      <button class="pin-btn confirm" onclick="verifyAuth()">VERIFY PIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXTERNAL SCRIPTS -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  // --- FIREBASE INITIALIZATION ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyCSQnuy8qaKJkco69iE5urVNr5FPMSx34w",
+    authDomain: "nightfall-terminal.firebaseapp.com",
+    projectId: "nightfall-terminal",
+    storageBucket: "nightfall-terminal.firebasestorage.app",
+    messagingSenderId: "383799418770",
+    appId: "1:383799418770:web:e2e0a7920c0453729bab4b",
+    measurementId: "G-44E4M1VDR7"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  function getFeeRate() {
+      let rate = parseFloat(document.getElementById('sys-fee').value);
+      return isNaN(rate) ? 25 : rate; 
+  }
+
+  // --- KEYCODE AUTHORIZATION SYSTEM ---
+  const ADMIN_PIN = "1234"; 
+  let authCallback = null; 
+  
+  const pinModalWrap = document.getElementById('pin-modal-wrap');
+  const pinInput = document.getElementById('auth-pin');
+  const pinError = document.getElementById('pin-error');
+
+  window.requireAuth = function(callbackFunction) {
+    if(callbackFunction === submitWash) {
+        const operator = document.getElementById('wash-operator').value;
+        const dirty = parseFloat(document.getElementById('calc-dirty').value);
+        if(!operator || isNaN(dirty) || dirty <= 0) return alert("Missing required fields.");
+    }
+    if(callbackFunction === saveMember) {
+        const name = document.getElementById('mem-name').value;
+        const rank = document.getElementById('mem-rank').value;
+        if(!name || !rank) return alert("Member Name and Rank are required.");
+    }
+    authCallback = callbackFunction;
+    pinError.innerText = "";
+    pinInput.value = "";
+    pinModalWrap.classList.add('active');
+    pinInput.focus();
+  };
+
+  window.cancelAuth = function() {
+    pinModalWrap.classList.remove('active');
+    authCallback = null;
+  };
+
+  window.verifyAuth = function() {
+    const enteredPin = pinInput.value;
+    if (enteredPin === ADMIN_PIN) {
+      pinModalWrap.classList.remove('active');
+      if (authCallback) {
+        authCallback(); 
+        authCallback = null;
+      }
+    } else {
+      pinError.innerText = "ACCESS DENIED: INVALID SECURITY PIN";
+      pinInput.value = "";
+      pinInput.focus();
+    }
+  };
+
+  pinInput.addEventListener("keypress", function(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      verifyAuth();
+    }
+  });
+
+  // --- GLOBAL DELETION LOGIC ---
+  let deletedElements = JSON.parse(localStorage.getItem('nightfall_deleted_elements')) || [];
+
+  window.removeLocalElement = function(id, event) {
+      if(event) { event.preventDefault(); event.stopPropagation(); }
+      if(confirm("Permanently delete this entry?")) {
+          const el = document.getElementById(id);
+          if(el) el.remove();
+          if(!deletedElements.includes(id)) {
+              deletedElements.push(id);
+              localStorage.setItem('nightfall_deleted_elements', JSON.stringify(deletedElements));
+          }
+      }
+  };
+
+  window.deleteLedger = function(docId, event) {
+      if(event) { event.preventDefault(); event.stopPropagation(); }
+      if(confirm("Permanently delete this ledger entry from the database?")) {
+          db.collection("wash_ledgers").doc(docId).delete().then(() => {
+              loadLedgers();
+          }).catch(err => {
+              console.error("Error removing document: ", err);
+              alert("Failed to delete entry. Check connection.");
+          });
+      }
+  };
+
+  // --- ROSTER DATA SYSTEM ---
+  let rosterData = JSON.parse(localStorage.getItem('nightfall_roster')) || [
+      { id: "dos-1", name: 'John "Reaper" Doe', alias: 'N/A', rank: 'President', img: '' },
+      { id: "dos-2", name: 'Mike "Ghost" K.', alias: 'The Mechanic', rank: 'Vice President', img: '' },
+      { id: "dos-3", name: 'Tommy "Rookie" S.', alias: 'TBD', rank: 'Picker', img: '' }
+  ];
+
+  function saveRoster() {
+      localStorage.setItem('nightfall_roster', JSON.stringify(rosterData));
+      renderRoster();
+  }
+
+  function renderRoster() {
+      const dossierGrid = document.getElementById('dossier-grid-main');
+      const rosterBody = document.getElementById('roster-table-body');
+      
+      if(dossierGrid) dossierGrid.innerHTML = '';
+      if(rosterBody) rosterBody.innerHTML = '';
+
+      rosterData.forEach(m => {
+          if(dossierGrid) {
+              const bg = m.img ? `background-image: url(${m.img}); color: transparent;` : '';
+              dossierGrid.innerHTML += `
+                <div class="dossier-card removable" id="card-${m.id}">
+                  <span class="delete-btn" onclick="requireAuth(() => deleteMember('${m.id}'))">✕</span>
+                  <div class="dossier-status"></div>
+                  <div class="dossier-img editable-img" style="${bg}" data-memid="${m.id}">[NO IMAGE ON FILE]</div>
+                  <div class="dossier-name">${m.name}</div>
+                  <div class="dossier-alias">Alias: ${m.alias}</div>
+                  <div class="dossier-rank">${m.rank}</div>
+                </div>
+              `;
+          }
+
+          if(rosterBody) {
+              rosterBody.innerHTML += `
+                <div class="term-row roster-grid">
+                  <div style="font-weight:bold;">${m.name}</div>
+                  <div class="term-desc">${m.alias}</div>
+                  <div><span class="badge accent">${m.rank}</span></div>
+                  <div style="display:flex; gap:5px;">
+                    <button class="btn" style="padding:4px 8px; font-size:10px;" onclick="openMemberPanel('${m.id}')">EDIT</button>
+                    <button class="btn" style="padding:4px 8px; font-size:10px; border-color:var(--red); color:var(--red);" onclick="requireAuth(() => deleteMember('${m.id}'))">DEL</button>
+                  </div>
+                </div>
+              `;
+          }
+      });
+
+      // Bind image uploaders to dynamically generated dossiers
+      document.querySelectorAll('.editable-img').forEach(img => {
+          img.addEventListener('click', (e) => {
+              if(isEditMode) {
+                  currentImageTarget = e.currentTarget;
+                  document.getElementById('image-uploader').click();
+              }
+          });
+      });
+  }
+
+  window.openMemberPanel = function(id = null) {
+      const title = document.getElementById('member-panel-title');
+      const idField = document.getElementById('mem-id');
+      const nameField = document.getElementById('mem-name');
+      const aliasField = document.getElementById('mem-alias');
+      const rankField = document.getElementById('mem-rank');
+
+      if(id) {
+          const m = rosterData.find(x => x.id === id);
+          title.innerText = "Edit Member Record";
+          idField.value = m.id;
+          nameField.value = m.name;
+          aliasField.value = m.alias;
+          rankField.value = m.rank;
+      } else {
+          title.innerText = "Add New Member";
+          idField.value = '';
+          nameField.value = '';
+          aliasField.value = '';
+          rankField.value = '';
+      }
+      openPanel('member-panel');
+  };
+
+  window.saveMember = function() {
+      const id = document.getElementById('mem-id').value;
+      const name = document.getElementById('mem-name').value;
+      const alias = document.getElementById('mem-alias').value;
+      const rank = document.getElementById('mem-rank').value;
+
+      if(id) {
+          const index = rosterData.findIndex(x => x.id === id);
+          if(index > -1) {
+              rosterData[index].name = name;
+              rosterData[index].alias = alias || 'N/A';
+              rosterData[index].rank = rank;
+          }
+      } else {
+          rosterData.push({
+              id: 'dos-' + Date.now(),
+              name: name,
+              alias: alias || 'N/A',
+              rank: rank,
+              img: ''
+          });
+      }
+      
+      saveRoster();
+      closePanel();
+  };
+
+  window.deleteMember = function(id) {
+      if(confirm("Permanently delete this member from the club database?")) {
+          rosterData = rosterData.filter(x => x.id !== id);
+          saveRoster();
+      }
+  };
+
+  // --- MAP INITIALIZATION ---
+  let map;
+  let mapInitialized = false;
+
+  function initMap() {
+      if(mapInitialized) { map.invalidateSize(); return; }
+      
+      map = L.map('leaflet-map-container', { crs: L.CRS.Simple, minZoom: -2 });
+      var bounds = [[0, 0], [1000, 1000]];
+      L.imageOverlay('gta-map.jpg', bounds).addTo(map);
+      map.fitBounds(bounds);
+
+      L.polygon([[450, 450], [550, 450], [550, 550], [450, 550]], {
+          color: '#7f5af0', fillColor: '#5a32fa', fillOpacity: 0.4
+      }).addTo(map).bindPopup("<b style='color:var(--accent2);font-size:12px;'>NIGHTFALL HQ</b>");
+
+      L.marker([600, 400]).addTo(map)
+          .bindPopup("<b style='color:var(--green);font-size:12px;'>PRIMARY STASH</b>");
+
+      mapInitialized = true;
+      setTimeout(() => map.invalidateSize(), 100);
+  }
+
+  // --- GLOBAL INLINE EDIT MODE (TEXT + IMAGES) ---
+  let isEditMode = false;
+  const imageUploader = document.getElementById('image-uploader');
+  let currentImageTarget = null;
+  
+  window.toggleEditMode = function() {
+      isEditMode = !isEditMode;
+      document.body.classList.toggle('edit-mode', isEditMode);
+      
+      const toggleBtn = document.getElementById('edit-mode-toggle-btn');
+      const saveBtn = document.getElementById('save-edits-btn');
+      
+      document.querySelectorAll('.editable').forEach(el => {
+          if (el.tagName === "INPUT" || el.tagName === "SELECT") {
+              el.disabled = !isEditMode;
+          } else {
+              el.contentEditable = isEditMode;
+          }
+      });
+
+      if(isEditMode) {
+          saveBtn.classList.remove('hidden');
+          toggleBtn.innerText = "DISABLE EDIT MODE";
+          toggleBtn.style.color = "var(--red)";
+      } else {
+          saveBtn.classList.add('hidden');
+          toggleBtn.innerText = "ENABLE EDIT MODE";
+          toggleBtn.style.color = "var(--muted)";
+      }
+  };
+
+  imageUploader.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if(file && currentImageTarget) {
+          const reader = new FileReader();
+          reader.onload = function(event) {
+              const base64 = event.target.result;
+              currentImageTarget.style.backgroundImage = `url(${base64})`;
+              currentImageTarget.innerText = ''; 
+              
+              const memId = currentImageTarget.getAttribute('data-memid');
+              if (memId) {
+                  const idx = rosterData.findIndex(x => x.id === memId);
+                  if (idx > -1) {
+                      rosterData[idx].img = base64;
+                      saveRoster(); 
+                  }
+              } else {
+                  currentImageTarget.setAttribute('data-img', base64);
+              }
+          };
+          reader.readAsDataURL(file);
+      }
+  });
+
+  window.saveAllEdits = function() {
+      const edits = {};
+      document.querySelectorAll('.editable').forEach(el => {
+          if (el.id) edits[el.id] = (el.tagName === "INPUT") ? el.value : el.innerText;
+      });
+      document.querySelectorAll('.editable-img').forEach(el => {
+          if(el.id && el.getAttribute('data-img')) edits[el.id + '_img'] = el.getAttribute('data-img');
+      });
+
+      localStorage.setItem('nightfall_terminal_edits', JSON.stringify(edits));
+      alert("System Update: Override parameters accepted and cached.");
+      if (isEditMode) toggleEditMode();
+      
+      let evt = new Event('input');
+      document.getElementById('calc-dirty').dispatchEvent(evt);
+  };
+
+  function restoreEdits() {
+      deletedElements.forEach(id => {
+          const el = document.getElementById(id);
+          if(el) el.remove();
+      });
+
+      const savedEdits = JSON.parse(localStorage.getItem('nightfall_terminal_edits'));
+      if(savedEdits) {
+          for(const key in savedEdits) {
+              if (key.endsWith('_img')) {
+                  const id = key.replace('_img', '');
+                  const el = document.getElementById(id);
+                  if (el && !el.hasAttribute('data-memid')) {
+                      el.style.backgroundImage = `url(${savedEdits[key]})`;
+                      el.innerText = '';
+                      el.setAttribute('data-img', savedEdits[key]);
+                  }
+              } else {
+                  const el = document.getElementById(key);
+                  if(el) {
+                      if (el.tagName === "INPUT") el.value = savedEdits[key];
+                      else el.innerText = savedEdits[key];
+                  }
+              }
+          }
+      }
+  }
+
+  // --- UI NAVIGATION ---
+  const navButtons = document.querySelectorAll('.nav-btn[data-target]');
+  const views = document.querySelectorAll('.view-section');
+
+  navButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      navButtons.forEach(b => b.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      views.forEach(view => view.classList.add('hidden'));
+      
+      const targetId = e.currentTarget.getAttribute('data-target');
+      document.getElementById(targetId).classList.remove('hidden');
+      if(targetId === 'view-map') initMap();
+    });
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    renderRoster(); // Generate Dossiers and Admin Table
+    restoreEdits(); // Load cache
+    loadLedgers();  // Load database
+    let evt = new Event('input');
+    document.getElementById('calc-dirty').dispatchEvent(evt);
+  });
+
+  // --- FACTION TABS & CREATION ---
+  const factionTabList = document.getElementById('faction-tab-list');
+  const factionContainer = document.getElementById('faction-content-container');
+  const addFactionBtn = document.getElementById('add-faction-btn');
+
+  function switchFactionTab(selectedTab, targetId) {
+    document.querySelectorAll('.f-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.faction-content').forEach(c => c.classList.remove('active'));
+    selectedTab.classList.add('active');
+    const targetContent = document.getElementById(targetId);
+    if(targetContent) targetContent.classList.add('active');
+  }
+
+  document.querySelectorAll('.f-tab').forEach(tab => {
+     tab.addEventListener('click', (e) => {
+         switchFactionTab(e.currentTarget, e.currentTarget.getAttribute('data-faction'));
+     });
+  });
+
+  addFactionBtn.addEventListener('click', () => {
+      requireAuth(() => {
+          const factionName = prompt("Enter new faction/crew name:");
+          if (!factionName) return; 
+          
+          const factionId = 'f-' + factionName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          
+          const newTab = document.createElement('button');
+          newTab.className = 'f-tab removable';
+          newTab.id = 'tab-' + factionId;
+          newTab.setAttribute('data-faction', factionId);
+          newTab.innerHTML = `${factionName} <span class="delete-btn" onclick="removeLocalElement('tab-${factionId}', event); removeLocalElement('${factionId}', event)">✕</span>`;
+          factionTabList.appendChild(newTab);
+
+          const newContent = document.createElement('div');
+          newContent.className = 'faction-content removable';
+          newContent.id = factionId;
+          newContent.innerHTML = `<div class="card"><div class="card-head"><div><div class="card-title">Intel</div></div></div><div class="term-desc editable" id="desc-${factionId}" style="padding: 12px; text-align: center; color: var(--muted); border: 1px dashed var(--border);">No intel gathered yet. Activate edit mode to add notes.</div></div>`;
+          factionContainer.appendChild(newContent);
+
+          newTab.addEventListener('click', (e) => {
+              switchFactionTab(e.currentTarget, factionId);
+          });
+          switchFactionTab(newTab, factionId);
+
+          if(isEditMode) {
+              newContent.querySelectorAll('.editable').forEach(el => el.contentEditable = true);
+          }
+      });
+  });
+
+  // --- MEMBER STATS TOGGLE LOGIC ---
+  window.setStatsTimeframe = function(timeframe, btnElement) {
+     const btns = btnElement.parentElement.querySelectorAll('.t-btn');
+     btns.forEach(b => b.classList.remove('active'));
+     btnElement.classList.add('active');
+
+     const baseData = {
+         m1: { tx: 14, dirty: 120000, clean: 91200, fee: 28800 },
+         m2: { tx: 8, dirty: 50000, clean: 38000, fee: 12000 },
+         m3: { tx: 3, dirty: 25000, clean: 19000, fee: 6000 },
+         m4: { tx: 1, dirty: 100000, clean: 75000, fee: 25000 }
+     };
+
+     let multiplier = 1;
+     if(timeframe === 'monthly') multiplier = 4.2;
+     if(timeframe === 'annual') multiplier = 52;
+     const fmt = (num) => '$' + Math.round(num).toLocaleString();
+
+     document.getElementById('ms-1-tx').innerText = Math.round(baseData.m1.tx * multiplier);
+     document.getElementById('ms-1-dirty').innerText = '-' + fmt(baseData.m1.dirty * multiplier);
+     document.getElementById('ms-1-fee').innerText = '+' + fmt(baseData.m1.fee * multiplier);
+     document.getElementById('ms-1-clean').innerText = '+' + fmt(baseData.m1.clean * multiplier);
+
+     document.getElementById('ms-2-tx').innerText = Math.round(baseData.m2.tx * multiplier);
+     document.getElementById('ms-2-dirty').innerText = '-' + fmt(baseData.m2.dirty * multiplier);
+     document.getElementById('ms-2-fee').innerText = '+' + fmt(baseData.m2.fee * multiplier);
+     document.getElementById('ms-2-clean').innerText = '+' + fmt(baseData.m2.clean * multiplier);
+
+     document.getElementById('ms-3-tx').innerText = Math.round(baseData.m3.tx * multiplier);
+     document.getElementById('ms-3-dirty').innerText = '-' + fmt(baseData.m3.dirty * multiplier);
+     document.getElementById('ms-3-fee').innerText = '+' + fmt(baseData.m3.fee * multiplier);
+     document.getElementById('ms-3-clean').innerText = '+' + fmt(baseData.m3.clean * multiplier);
+
+     const ms4tx = document.getElementById('ms-4-tx');
+     if (ms4tx) {
+         ms4tx.innerText = Math.round(baseData.m4.tx * multiplier);
+         document.getElementById('ms-4-dirty').innerText = '-' + fmt(baseData.m4.dirty * multiplier);
+         document.getElementById('ms-4-fee').innerText = '+' + fmt(baseData.m4.fee * multiplier);
+         document.getElementById('ms-4-clean').innerText = '+' + fmt(baseData.m4.clean * multiplier);
+     }
+  };
+
+  // --- SLIDE OUT PANELS ---
+  const overlay = document.getElementById('slide-overlay');
+  let currentOpenPanel = null;
+  window.openPanel = function(id) { const p = document.getElementById(id); if(p){ p.classList.add('open'); overlay.classList.add('open'); currentOpenPanel = p; } };
+  window.closePanel = function() { 
+    if(currentOpenPanel){ 
+      currentOpenPanel.classList.remove('open'); 
+      overlay.classList.remove('open'); 
+      currentOpenPanel = null; 
+      
+      if (document.getElementById('wash-operator')) document.getElementById('wash-operator').value = '';
+      if (document.getElementById('calc-dirty')) document.getElementById('calc-dirty').value = '';
+      if (document.getElementById('calc-fee')) document.getElementById('calc-fee').innerText = '-$0';
+      if (document.getElementById('calc-clean')) document.getElementById('calc-clean').innerText = '+$0';
+      
+      if (document.getElementById('mem-id')) document.getElementById('mem-id').value = '';
+      if (document.getElementById('mem-name')) document.getElementById('mem-name').value = '';
+      if (document.getElementById('mem-alias')) document.getElementById('mem-alias').value = '';
+      if (document.getElementById('mem-rank')) document.getElementById('mem-rank').value = '';
+    } 
+  };
+
+  // --- VARIABLE WASH RATE CALCULATOR ---
+  const dirtyInput = document.getElementById('calc-dirty');
+  const feeOutput = document.getElementById('calc-fee');
+  const cleanOutput = document.getElementById('calc-clean');
+  const displayFeeRate = document.getElementById('display-fee-rate');
+
+  document.getElementById('sys-fee').addEventListener('input', () => {
+      let evt = new Event('input');
+      dirtyInput.dispatchEvent(evt);
+  });
+
+  dirtyInput.addEventListener('input', (e) => {
+    let val = parseFloat(e.target.value) || 0;
+    let rate = getFeeRate();
+    
+    displayFeeRate.innerText = rate;
+    let fee = val * (rate / 100);
+    feeOutput.innerText = '-$' + fee.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+    cleanOutput.innerText = '+$' + (val - fee).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+  });
+
+  // --- SUBMIT / LOAD LEDGERS ---
+  window.submitWash = function() {
+    const operator = document.getElementById('wash-operator').value;
+    const dirty = parseFloat(dirtyInput.value);
+    const rate = getFeeRate();
+    
+    closePanel(); 
+    
+    db.collection("wash_ledgers").add({
+      operator: operator, 
+      dirty_amount: dirty, 
+      fee_amount: dirty * (rate / 100), 
+      clean_returned: dirty - (dirty * (rate / 100)),
+      fee_rate: rate,
+      status: 'CLEARED', 
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+      loadLedgers();
+    }).catch(err => {
+      console.error("DB Error:", err);
+      alert("Database error: Could not commit ledger record.");
+    });
+  };
+
+  function loadLedgers() {
+    const table = document.getElementById('ledger-table');
+    table.innerHTML = `<div class="term-row head ledger-grid"><div>ID</div><div>Operator</div><div>Dirty Input</div><div>Tax / Fee</div><div>Clean Out</div><div>Status</div></div>`;
+    
+    db.collection("wash_ledgers").orderBy("timestamp", "desc").limit(50).get().then((snap) => {
+      let totDirty = 0, totClean = 0;
+      snap.forEach(doc => {
+        const d = doc.data();
+        totDirty += d.dirty_amount || 0; totClean += d.clean_returned || 0;
+        const displayRate = d.fee_rate ? `${d.fee_rate}%` : '25%';
+        
+        const row = document.createElement('div'); 
+        row.className = 'term-row ledger-grid removable';
+        row.innerHTML = `
+          <span class="delete-btn" onclick="deleteLedger('${doc.id}', event)">✕</span>
+          <div class="mono-num" style="color:var(--muted);">#${doc.id.substring(0,5).toUpperCase()}</div>
+          <div class="term-desc"><strong>${d.operator}</strong></div>
+          <div class="mono-num text-red">-$${(d.dirty_amount||0).toLocaleString()}</div>
+          <div class="mono-num" style="color:var(--muted);">-${displayRate}</div>
+          <div class="mono-num text-green">+$${(d.clean_returned||0).toLocaleString()}</div>
+          <div><span class="badge green">${d.status}</span></div>
+        `;
+        table.appendChild(row);
+      });
+      document.getElementById('dash-dirty').innerText = '$' + totDirty.toLocaleString();
+      document.getElementById('dash-clean').innerText = '$' + totClean.toLocaleString();
+    });
+  }
+</script>
+</body>
+</html>
